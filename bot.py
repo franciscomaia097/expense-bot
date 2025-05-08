@@ -59,7 +59,7 @@ def categorize(item):
         return "Saúde"
 
     # Lazer
-    if any(word in item for word in ["netflix", "spotify", "cinema", "jogo", "livro", "bilhete", "evento", "lazer"]):
+    if any(word in item for word in ["netflix", "spotify", "cinema", "jogo", "livro", "bilhete", "evento", "lazer", "hotel", "airbnb"]):
         return "Lazer"
     
     # Casa
