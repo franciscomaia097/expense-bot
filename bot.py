@@ -47,7 +47,7 @@ def categorize(item):
         return "Mobilidade"
 
     # Alimentação fora de casa
-    if any(word in item for word in ["restaurante", "café", "hambúrguer", "mcdonald", "pizza", "burger", "sushi", "pastelaria", "snack"]):
+    if any(word in item for word in ["restaurante", "café", "hambúrguer", "mcdonald", "pizza", "burger", "sushi", "jantar", "snack"]):
         return "Alimentação fora de casa"
     
     # Supermercado
@@ -119,10 +119,10 @@ async def handle_message(update, context):
 # Handle the "resumo <month>" command
 async def resumo(update, context):
     if len(context.args) < 1:
-        await update.message.reply_text("❌ Por favor, forneça o mês (ex: resumo maio).")
-        return
-    
-    month_name = context.args[0].lower()
+        # No month specified, summarize all months
+        month_name = None
+    else:
+        month_name = context.args[0].lower()
     
     # Map month name to month number
     month_map = {
@@ -130,11 +130,9 @@ async def resumo(update, context):
         'julho': 7, 'agosto': 8, 'setembro': 9, 'outubro': 10, 'novembro': 11, 'dezembro': 12
     }
     
-    if month_name not in month_map:
+    if month_name and month_name not in month_map:
         await update.message.reply_text("❌ Mês inválido. Use um mês válido (ex: maio).")
         return
-    
-    month_num = month_map[month_name]
     
     # Fetch the sheet data
     records = sheet.get_all_records()
@@ -143,39 +141,54 @@ async def resumo(update, context):
     # Ensure the 'Data' column is in datetime format
     df['Data'] = pd.to_datetime(df['Data'])
     
-    # Filter by the given month
-    df['Month'] = df['Data'].dt.month
-    df_filtered = df[df['Month'] == month_num]
-    
-    # If no data for that month
-    if df_filtered.empty:
-        await update.message.reply_text(f"❌ Não há despesas registradas para o mês de {month_name}.")
-        return
-    
-    # Summarize expenses by category
-    summary = df_filtered.groupby('Categoria')['Montante'].sum().reset_index()
-    
-    # Calculate total expenses
-    total_expenses = df_filtered['Montante'].sum()
+    if month_name:
+        # Filter by the given month
+        month_num = month_map[month_name]
+        df['Month'] = df['Data'].dt.month
+        df_filtered = df[df['Month'] == month_num]
+        
+        if df_filtered.empty:
+            await update.message.reply_text(f"❌ Não há despesas registradas para o mês de {month_name}.")
+            return
+        
+        # Summarize expenses by category
+        summary = df_filtered.groupby('Categoria')['Montante'].sum().reset_index()
 
-    # Your income is 1300€
-    income = 1300
-    
-    # Calculate savings
-    savings = income - total_expenses
+        # Prepare the response message
+        response = f"Resumo de despesas para o mês de {month_name}:\n"
+        for _, row in summary.iterrows():
+            response += f"{row['Categoria']}: {row['Montante']:.2f}€\n"
 
-    # Prepare the response message
-    response = f"Resumo de despesas para o mês de {month_name}:\n\n"
-    response += "Categoria | Montante\n"
-    response += "-----------------------\n"
-    for _, row in summary.iterrows():
-        response += f"{row['Categoria']}: {row['Montante']:.2f}€\n"
-    
-    response += f"\nTotal de despesas: {total_expenses:.2f}€"
-    response += f"\nRenda mensal: {income}€"
-    response += f"\nPoupança (Renda - Despesas): {savings:.2f}€"
-    
-    await update.message.reply_text(response)
+        # Calculate savings for the specified month
+        total_expenses = df_filtered['Montante'].sum()
+        savings = 1300 - total_expenses
+        response += f"\n💰 Poupança: {savings:.2f}€"
+        await update.message.reply_text(response)
+    else:
+        # Summarize expenses for all months
+        df['Month'] = df['Data'].dt.month
+        summary_all_months = df.groupby(['Month', 'Categoria'])['Montante'].sum().reset_index()
+
+        # Prepare the response message for all months
+        response = "Resumo de despesas por mês:\n"
+        for month_num in range(1, 13):
+            month_name = list(month_map.keys())[month_num - 1]
+            df_month = summary_all_months[summary_all_months['Month'] == month_num]
+            
+            if df_month.empty:
+                continue  # Skip empty months
+            
+            response += f"\nMês de {month_name}:\n"
+            for _, row in df_month.iterrows():
+                response += f"{row['Categoria']}: {row['Montante']:.2f}€\n"
+
+            # Calculate savings for the month
+            total_expenses = df_month['Montante'].sum()
+            savings = 1300 - total_expenses
+            response += f"💰 Poupança: {savings:.2f}€\n"
+
+        await update.message.reply_text(response)
+
 
 
 # Handle the "despesas <month>" command
