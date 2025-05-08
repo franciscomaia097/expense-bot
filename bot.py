@@ -22,10 +22,7 @@ credentials_json = os.getenv("GOOGLE_CREDENTIALS")
 if credentials_json:
     try:
         parsed = json.loads(credentials_json)
-        print("Loaded JSON successfully.")
     except json.JSONDecodeError as e:
-        print(f"JSON error: {e}")
-        print(f"Raw env: {credentials_json[:100]}...")  # Mostra só o início para debugging
         exit(1)
 
     creds = ServiceAccountCredentials.from_json_keyfile_dict(parsed, scope)
@@ -83,6 +80,9 @@ def categorize(item):
     # Transferências financeiras
     if any(word in item for word in ["mbway", "transferência", "paypal", "wise", "revolut"]):
         return "Transferência / Outros"
+    
+    if any(word in item for word in ["tabaco", "cigarro", "cigarros"]):
+        return "Tabaco"
 
     return "Outros"
 
@@ -115,6 +115,7 @@ async def handle_message(update, context):
         await update.message.reply_text("❌ Formato inválido. Exemplo: Café - 2.50 - café com amigos")
 
 
+# Handle the "resumo <month>" command
 # Handle the "resumo <month>" command
 async def resumo(update, context):
     if len(context.args) < 1:
@@ -153,14 +154,74 @@ async def resumo(update, context):
     
     # Summarize expenses by category
     summary = df_filtered.groupby('Categoria')['Montante'].sum().reset_index()
+    
+    # Calculate total expenses
+    total_expenses = df_filtered['Montante'].sum()
+
+    # Your income is 1300€
+    income = 1300
+    
+    # Calculate savings
+    savings = income - total_expenses
 
     # Prepare the response message
-    response = f"Resumo de despesas para o mês de {month_name}:\n"
+    response = f"Resumo de despesas para o mês de {month_name}:\n\n"
+    response += "Categoria | Montante\n"
+    response += "-----------------------\n"
     for _, row in summary.iterrows():
         response += f"{row['Categoria']}: {row['Montante']:.2f}€\n"
-
+    
+    response += f"\nTotal de despesas: {total_expenses:.2f}€"
+    response += f"\nRenda mensal: {income}€"
+    response += f"\nPoupança (Renda - Despesas): {savings:.2f}€"
+    
     await update.message.reply_text(response)
 
+
+# Handle the "despesas <month>" command
+async def despesas(update, context):
+    if len(context.args) < 1:
+        await update.message.reply_text("❌ Por favor, forneça o mês (ex: despesas maio).")
+        return
+    
+    month_name = context.args[0].lower()
+    
+    # Map month name to month number
+    month_map = {
+        'janeiro': 1, 'fevereiro': 2, 'março': 3, 'abril': 4, 'maio': 5, 'junho': 6,
+        'julho': 7, 'agosto': 8, 'setembro': 9, 'outubro': 10, 'novembro': 11, 'dezembro': 12
+    }
+    
+    if month_name not in month_map:
+        await update.message.reply_text("❌ Mês inválido. Use um mês válido (ex: maio).")
+        return
+    
+    month_num = month_map[month_name]
+    
+    # Fetch the sheet data
+    records = sheet.get_all_records()
+    df = pd.DataFrame(records)
+    
+    # Ensure the 'Data' column is in datetime format
+    df['Data'] = pd.to_datetime(df['Data'])
+    
+    # Filter by the given month
+    df['Month'] = df['Data'].dt.month
+    df_filtered = df[df['Month'] == month_num]
+    
+    # If no data for that month
+    if df_filtered.empty:
+        await update.message.reply_text(f"❌ Não há despesas registradas para o mês de {month_name}.")
+        return
+    
+    # Prepare the response message
+    response = f"Despesas para o mês de {month_name}:\n\n"
+    response += "Item | Montante | Categoria | Descrição\n"
+    response += "-------------------------------------------\n"
+    for _, row in df_filtered.iterrows():
+        response += f"{row['Item']} | {row['Montante']:.2f}€ | {row['Categoria']} | {row['Descrição']}\n"
+    
+    await update.message.reply_text(response)
 
 # Start bot
 def main():
@@ -170,6 +231,7 @@ def main():
     # Handlers
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CommandHandler("resumo", resumo))
+    app.add_handler(CommandHandler("despesas", despesas))
 
     print("Bot running...")
     app.run_polling()
