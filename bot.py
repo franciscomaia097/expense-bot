@@ -12,10 +12,6 @@ load_dotenv()
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
 # Get the credentials JSON from the environment variable
-credentials_json = os.getenv("GOOGLE_CREDENTIALS")
-
-import os
-import json
 
 credentials_json = os.getenv("GOOGLE_CREDENTIALS")
 
@@ -161,7 +157,7 @@ async def resumo(update, context):
 
         # Calculate savings for the specified month
         total_expenses = df_filtered['Montante'].sum()
-        savings = 1300 - total_expenses
+        savings = 1500 - total_expenses
         response += f"\n💰 Poupança: {savings:.2f}€"
         await update.message.reply_text(response)
     else:
@@ -184,7 +180,7 @@ async def resumo(update, context):
 
             # Calculate savings for the month
             total_expenses = df_month['Montante'].sum()
-            savings = 1300 - total_expenses
+            savings = 1500 - total_expenses
             response += f"💰 Poupança: {savings:.2f}€\n"
 
         await update.message.reply_text(response)
