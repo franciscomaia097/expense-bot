@@ -6,6 +6,9 @@ import pandas as pd
 from dotenv import load_dotenv
 import os
 import json
+import io
+import matplotlib.pyplot as plt
+
 load_dotenv()
 
 # Setup Google Sheets
@@ -232,6 +235,66 @@ async def despesas(update, context):
     
     await update.message.reply_text(response)
 
+# Function to generate and send a chart
+async def gerar_grafico(update, context):
+    if len(context.args) < 1:
+        await update.message.reply_text("❌ Por favor, forneça o mês (ex: grafico maio).")
+        return
+
+    month_name = context.args[0].lower()
+    
+    # Map month name to month number
+    month_map = {
+        'janeiro': 1, 'fevereiro': 2, 'março': 3, 'abril': 4, 'maio': 5, 'junho': 6,
+        'julho': 7, 'agosto': 8, 'setembro': 9, 'outubro': 10, 'novembro': 11, 'dezembro': 12
+    }
+    
+    if month_name not in month_map:
+        await update.message.reply_text("❌ Mês inválido. Use um mês válido (ex: maio).")
+        return
+    
+    month_num = month_map[month_name]
+    
+    # Fetch the sheet data
+    records = sheet.get_all_records()
+    df = pd.DataFrame(records)
+    
+    # Ensure the 'Data' column is in datetime format
+    df['Data'] = pd.to_datetime(df['Data'])
+    
+    # Filter by the given month
+    df['Month'] = df['Data'].dt.month
+    df_filtered = df[df['Month'] == month_num]
+    
+    # If no data for that month
+    if df_filtered.empty:
+        await update.message.reply_text(f"❌ Não há despesas registradas para o mês de {month_name}.")
+        return
+    
+    # Summarize expenses by category
+    summary = df_filtered.groupby('Categoria')['Montante'].sum().reset_index()
+
+    # Prepare data for the pie chart
+    categories = summary['Categoria'].tolist()
+    amounts = summary['Montante'].tolist()
+
+    # Create a pie chart
+    fig, ax = plt.subplots()
+    ax.pie(amounts, labels=categories, autopct='%1.1f%%', startangle=90, colors=plt.cm.Paired.colors)
+    ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+
+    # Save the plot in a memory buffer
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+
+    # Send the plot to the user
+    await update.message.reply_photo(buf, caption=f"Gráfico de despesas para o mês de {month_name.capitalize()}")
+
+    # Close the plot to free memory
+    plt.close(fig)
+
+
 # Start bot
 def main():
     token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -241,6 +304,7 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CommandHandler("resumo", resumo))
     app.add_handler(CommandHandler("despesas", despesas))
+    app.add_handler(CommandHandler("grafico", gerar_grafico))
 
     print("Bot running...")
     app.run_polling()
