@@ -161,7 +161,8 @@ async def resumo(update, context):
         # Calculate savings for the specified month
         total_expenses = df_filtered['Montante'].sum()
         savings = 1500 - total_expenses
-        response += f"\n💰 Poupança: {savings:.2f}€"
+        response += f"\n📉 Total de despesas: {total_expenses:.2f}€"
+        response += f"\n🐷 Poupança: {savings:.2f}€"
         await update.message.reply_text(response)
     else:
         # Summarize expenses for all months
@@ -184,7 +185,8 @@ async def resumo(update, context):
             # Calculate savings for the month
             total_expenses = df_month['Montante'].sum()
             savings = 1500 - total_expenses
-            response += f"💰 Poupança: {savings:.2f}€\n"
+            response += f"📉 Total de despesas: {total_expenses:.2f}€\n"
+            response += f"🐷 Poupança: {savings:.2f}€\n"
 
         await update.message.reply_text(response)
 
