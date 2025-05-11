@@ -109,7 +109,11 @@ async def handle_message(update, context):
 
         # Append to the Google Sheet with description
         sheet.append_row([today, item, amount, category, description])
-        await update.message.reply_text(f"✅ Added: {item} - {amount:.2f} € on {today}" + (f" - Description: {description}" if description else ""))
+        await update.message.reply_text(
+         f"✅ Adicionado: {item} - {amount:.2f} € em {today} - Categoria: {category}"
+         + (f" - Descrição: {description}" if description else "")
+        )
+
     except Exception as e:
         await update.message.reply_text("❌ Formato inválido. Exemplo: Café - 2.50 - café com amigos")
 
