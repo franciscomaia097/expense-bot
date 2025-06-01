@@ -38,7 +38,7 @@ def categorize(item):
     item = item.lower()
 
     # Transporte
-    if any(word in item for word in ["gasóleo", "combustível", "gasolina", "transporte", "cp", "metro", "vistoria", "selo", "seguro"]):
+    if any(word in item for word in ["gasóleo", "combustível", "gasolina", "transporte", "cp", "metro", "vistoria", "selo", "seguro", "portagens"]):
         return "Carro"
     
     # Mobilidade (apps)
@@ -73,7 +73,7 @@ def categorize(item):
     if any(word in item for word in ["curso", "formação", "aula", "licença", "certificado"]):
         return "Educação"
 
-    if any(word in item for word in ["xtb", "investimento", "banco", "carteira", "carteira de investimentos", "carteira de investimentos", "carteira de investimentos", "carteira de investimentos"]):
+    if any(word in item for word in ["xtb", "investimento", "banco", "carteira", "carteira de investimentos", "carteira de investimentos", "carteira de investimentos", "carteira de investimentos", "bitcoin"]):
         return "Investimentos"
 
     # Transferências financeiras
@@ -241,7 +241,6 @@ async def despesas(update, context):
     
     await update.message.reply_text(response)
 
-# Function to generate and send a chart
 async def gerar_grafico(update, context):
     if len(context.args) < 1:
         await update.message.reply_text("❌ Por favor, forneça o mês (ex: grafico maio).")
@@ -249,7 +248,6 @@ async def gerar_grafico(update, context):
 
     month_name = context.args[0].lower()
     
-    # Map month name to month number
     month_map = {
         'janeiro': 1, 'fevereiro': 2, 'março': 3, 'abril': 4, 'maio': 5, 'junho': 6,
         'julho': 7, 'agosto': 8, 'setembro': 9, 'outubro': 10, 'novembro': 11, 'dezembro': 12
@@ -261,43 +259,47 @@ async def gerar_grafico(update, context):
     
     month_num = month_map[month_name]
     
-    # Fetch the sheet data
     records = sheet.get_all_records()
     df = pd.DataFrame(records)
-    
-    # Ensure the 'Data' column is in datetime format
     df['Data'] = pd.to_datetime(df['Data'])
-    
-    # Filter by the given month
     df['Month'] = df['Data'].dt.month
     df_filtered = df[df['Month'] == month_num]
     
-    # If no data for that month
     if df_filtered.empty:
         await update.message.reply_text(f"❌ Não há despesas registradas para o mês de {month_name}.")
         return
     
-    # Summarize expenses by category
     summary = df_filtered.groupby('Categoria')['Montante'].sum().reset_index()
+    total_expenses = summary['Montante'].sum()
+    savings = max(0, 1500 - total_expenses)
 
-    # Prepare data for the pie chart
+    novo_dado = pd.DataFrame([{'Categoria': 'Poupança', 'Montante': savings}])
+    summary = pd.concat([summary, novo_dado], ignore_index=True)
+
     categories = summary['Categoria'].tolist()
     amounts = summary['Montante'].tolist()
 
-    # Create a pie chart
-    fig, ax = plt.subplots()
-    ax.pie(amounts, labels=categories, autopct='%1.1f%%', startangle=90, colors=plt.cm.Paired.colors)
-    ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+    # Função para mostrar valor em euros no gráfico
+    def mostrar_valor_absoluto(pct):
+        total = sum(amounts)
+        valor = int(round(pct * total / 100.0))
+        return f'{valor} €'
 
-    # Save the plot in a memory buffer
+    fig, ax = plt.subplots()
+    ax.pie(
+        amounts,
+        labels=categories,
+        autopct=mostrar_valor_absoluto,
+        startangle=90,
+        colors=plt.cm.Paired.colors
+    )
+    ax.axis('equal')
+
     buf = io.BytesIO()
     plt.savefig(buf, format='png')
     buf.seek(0)
 
-    # Send the plot to the user
-    await update.message.reply_photo(buf, caption=f"Gráfico de despesas para o mês de {month_name.capitalize()}")
-
-    # Close the plot to free memory
+    await update.message.reply_photo(buf, caption=f"📊 Gráfico de despesas para o mês de {month_name.capitalize()} (valores em euros, inclui poupança)")
     plt.close(fig)
 
 
